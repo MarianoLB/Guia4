@@ -134,12 +134,14 @@ def resolver(MC,MN,gl,kel,F,s):
     Ku=np.linalg.solve(krr,b)
     
     u[r]=Ku
+    u[np.abs(u) < 1e-10] = 0
     
     Fint=K@u
     Fint[np.abs(Fint)<1e-10]=0
     
     R=Fint-F
     R[np.abs(R)<1e-10]=0
+    
     
     U=u.reshape(len(MN),gl)
     Fnod=Fint.reshape(len(MN),gl)
@@ -166,3 +168,43 @@ def esfuerzos(MC,MN,gl,u,D,B):
     sig[np.abs(sig)<1e-10]=0
     
     return sig
+
+#-------------------------------------
+def Triangulos(MC,MN,gl,E,v,t=1):
+    
+    nxel=len(MC[0])
+    x=np.zeros([len(MC),nxel])
+    y=np.zeros([len(MC),nxel])
+    B=np.zeros([len(MC),3,gl*nxel])
+    beta=np.zeros((len(MC),nxel))
+    gamma=np.zeros((len(MC),nxel))
+    A=np.zeros(len(MC))
+    kel=np.zeros((len(MC),gl*nxel,gl*nxel))
+    
+    D=(E/(1-v**2))*np.array([[1,v,0],
+                             [v,1,0],
+                             [0,0,(1-v)/2]])
+    
+    for e in range(len(MC)):
+        for i in range(nxel):
+            x[e,i]=MN[MC[e,i],0]
+            y[e,i]=MN[MC[e,i],1]
+            
+        beta[e,:]=[y[e,1]-y[e,2],y[e,2]-y[e,0],y[e,0]-y[e,1]]
+        gamma[e,:]=[x[e,2]-x[e,1],x[e,0]-x[e,2],x[e,1]-x[e,0]]
+        
+        A[e]=0.5*np.linalg.det(np.array([[1,x[e,0],y[e,0]],
+                                         [1,x[e,1],y[e,1]],
+                                         [1,x[e,2],y[e,2]]]))
+        
+        B[e,:,:]=(1/(2*A[e]))*np.array([
+        [beta[e,0],0,beta[e,1],0,beta[e,2],0],
+        [0,gamma[e,0],0,gamma[e,1],0,gamma[e,2]],
+        [gamma[e,0],beta[e,0],gamma[e,1],beta[e,1],gamma[e,2],beta[e,2]]])
+        
+        kel[e,:,:]=t*abs(A[e])*np.transpose(B[e,:,:])@D@B[e,:,:]
+        
+        kel[e][np.abs(kel[e])<1e-10]=0
+        B[e][np.abs(B[e])<1e-10]=0
+        
+    return kel,B,A,D
